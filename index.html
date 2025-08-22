@@ -1,301 +1,326 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Interactive Fluid — GPU (WebGL2) Motion + High Contrast</title>
-  <style>
-    :root{ --bg:#0b0f14; --panel:#121821; --muted:#99a3ad; }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:#e8eef6;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial}
-    .wrap{display:grid;grid-template-columns:1fr 380px;grid-template-rows:1fr;gap:12px;height:100vh;padding:12px}
-    .canvasWrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid #1f2a36;box-shadow:0 10px 30px rgba(0,0,0,.35);min-height:420px}
-    canvas{display:block;width:100%;height:100%;background:#05070a}
-    .hud{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border:1px solid #1f2a36;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.25}
-    .sidebar{background:var(--panel);border:1px solid #1f2a36;border-radius:14px;padding:14px 14px 10px;overflow:auto}
-    h1{font-size:18px;margin:0 0 8px;color:#eef6ff}
-    h2{font-size:13px;font-weight:600;margin:16px 0 6px;color:#cfe3ff}
-    .row{display:grid;grid-template-columns:1fr 96px;gap:8px;align-items:center;margin:6px 0}
-    .row input[type=range]{width:100%}
-    .row output{justify-self:end;font-variant-numeric:tabular-nums;color:#d1deef}
-    .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-    button{background:#182232;border:1px solid #233145;color:#e7f0fb;padding:7px 10px;border-radius:10px;cursor:pointer}
-    button:hover{background:#1c2a3f}
-    .palette{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 2px}
-    .swatch{width:26px;height:26px;border-radius:6px;border:2px solid #1b2533;cursor:pointer}
-    .swatch.active{outline:2px solid #fff;outline-offset:2px}
-    .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:#cde1fb}
-    .toggle input{transform:translateY(1px)}
-    video{display:none}
-    @media (max-width:980px){.wrap{grid-template-columns:1fr}}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Fluid Simulation - Hand Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- MediaPipe Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+            touch-action: none;
+        }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border: 2px solid #4f46e5;
+            border-radius: 50%;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        .slider-thumb::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border: 2px solid #4f46e5;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .color-btn.active {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5);
+        }
+    </style>
 </head>
-<body>
-  <div class="wrap">
-    <div class="canvasWrap">
-      <canvas id="view"></canvas>
-      <div class="hud" id="hud"></div>
+<body class="bg-gray-900 text-white overflow-hidden flex flex-col h-screen">
+
+    <!-- Video element for webcam input (now hidden) -->
+    <video id="input-video" class="hidden"></video>
+
+    <!-- Canvas for the simulation -->
+    <canvas id="fluid-canvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
+
+    <!-- UI Controls -->
+    <div id="controls" class="relative z-10 p-4 bg-gray-900 bg-opacity-80 backdrop-blur-sm transition-opacity duration-300">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <h1 class="text-xl md:text-2xl font-bold text-indigo-400">Fluid Dynamics</h1>
+                
+                <!-- Sliders -->
+                <div class="flex flex-wrap items-center gap-x-6 gap-y-4">
+                    <!-- Sliders here... -->
+                    <div class="flex flex-col space-y-1 min-w-[120px]">
+                        <label for="viscosity" class="text-xs font-medium text-gray-300">Viscosity</label>
+                        <input id="viscosity" type="range" min="0" max="0.0001" step="0.000001" value="0.00002" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+                    <div class="flex flex-col space-y-1 min-w-[120px]">
+                        <label for="diffusion" class="text-xs font-medium text-gray-300">Diffusion</label>
+                        <input id="diffusion" type="range" min="0" max="0.0005" step="0.00001" value="0.000001" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+                    <div class="flex flex-col space-y-1 min-w-[120px]">
+                        <label for="force" class="text-xs font-medium text-gray-300">Force</label>
+                        <input id="force" type="range" min="5" max="100" step="1" value="60" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+                    <div class="flex flex-col space-y-1 min-w-[120px]">
+                        <label for="dye-amount" class="text-xs font-medium text-gray-300">Dye Amount</label>
+                        <input id="dye-amount" type="range" min="10" max="100" step="1" value="20" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+                </div>
+
+                <!-- Color and Action Buttons -->
+                <div class="flex items-center gap-3">
+                    <div id="color-palette" class="flex items-center gap-2">
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200 active" style="background-color: #e60073;" data-color="[230, 0, 115]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #00bfff;" data-color="[0, 191, 255]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #ffdd00;" data-color="[255, 221, 0]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #39ff14;" data-color="[57, 255, 20]"></button>
+                    </div>
+                    <!-- NEW: Camera Selector -->
+                    <div class="flex flex-col space-y-1">
+                         <label for="camera-select" class="text-xs font-medium text-gray-300">Camera</label>
+                         <select id="camera-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-1.5"></select>
+                    </div>
+                    <button id="clear-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-sm font-semibold transition-colors self-end">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="info-text" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 text-center text-xs text-gray-400 bg-gray-900/50 px-3 py-1 rounded-full pointer-events-none">
+        Initializing camera... Move your hand to control the fluid.
     </div>
 
-    <aside class="sidebar">
-      <h1>Fluid (GPU) — Motion Control</h1>
-
-      <h2>Performance</h2>
-      <div class="row"><label>Sim resolution</label><output id="outRes">128</output></div>
-      <input id="rangeRes" type="range" min="64" max="256" step="16" value="128" />
-      <div class="row"><label>Render scale</label><output id="outScale">0.80</output></div>
-      <input id="rangeScale" type="range" min="0.50" max="1.00" step="0.05" value="0.80" />
-      <label class="toggle"><input id="chkHidpi" type="checkbox"> HiDPI (più nitido, più lento)</label>
-      <label class="toggle"><input id="chkAdaptive" type="checkbox" checked> Iterazioni adattive</label>
-
-      <h2>Fisica</h2>
-      <div class="row"><label>Δt</label><output id="outDt">0.016</output></div>
-      <input id="rangeDt" type="range" min="0.005" max="0.05" step="0.001" value="0.016" />
-      <div class="row"><label>Jacobi iters</label><output id="outIter">28</output></div>
-      <input id="rangeIter" type="range" min="8" max="80" step="1" value="28" />
-      <div class="row"><label>Dye decay</label><output id="outDecay">0.10</output></div>
-      <input id="rangeDecay" type="range" min="0" max="1" step="0.01" value="0.10" />
-
-      <h2>Pennello</h2>
-      <div class="row"><label>Forza</label><output id="outForce">60</output></div>
-      <input id="rangeForce" type="range" min="0" max="200" step="1" value="60" />
-      <div class="row"><label>Dye amount</label><output id="outDye">3.0</output></div>
-      <input id="rangeDye" type="range" min="0" max="15" step="0.1" value="3.0" />
-      <div class="row"><label>Raggio</label><output id="outRad">8</output></div>
-      <input id="rangeRad" type="range" min="1" max="40" step="1" value="8" />
-
-      <h2>Colore</h2>
-      <div class="palette" id="palette"></div>
-      <div class="row"><label>Custom</label><output id="outHex">#3fd0ff</output></div>
-      <input id="colorPick" type="color" value="#3fd0ff" />
-
-      <div class="btns">
-        <button id="btnPause" title="Space">⏯ Pausa</button>
-        <button id="btnClearDye">🧼 Pulisci dye</button>
-        <button id="btnSplash">✨ Splash</button>
-        <button id="btnPresetSpeed">⚡ Speed</button>
-        <button id="btnPresetQuality">🎨 Quality</button>
-      </div>
-
-      <h2>Hand Control (Webcam)</h2>
-      <div class="btns"><button id="btnCam">📷 Avvia camera</button></div>
-      <label class="toggle"><input id="chkHand" type="checkbox" checked> Abilita tracking mano</label>
-      <label class="toggle"><input id="chkMotion" type="checkbox" checked> Disegna con il movimento</label>
-      <label class="toggle"><input id="chkAlways" type="checkbox"> Sempre disegna</label>
-      <div class="row"><label>Soglia movimento (px)</label><output id="outMotion">1.0</output></div>
-      <input id="rangeMotion" type="range" min="0" max="12" step="0.1" value="1.0" />
-      <div class="row"><label>Smoothing</label><output id="outSmooth">0.40</output></div>
-      <input id="rangeSmooth" type="range" min="0" max="0.95" step="0.05" value="0.40" />
-      <div class="row"><label>Sensibilità</label><output id="outSens">1.50</output></div>
-      <input id="rangeSens" type="range" min="0.20" max="3.00" step="0.05" value="1.50" />
-      <label class="toggle"><input id="chkMirror" type="checkbox" checked> Mirror</label>
-
-      <h2>Display</h2>
-      <div class="row"><label>Exposure</label><output id="outExp">1.90</output></div>
-      <input id="rangeExp" type="range" min="0.50" max="4.00" step="0.05" value="1.90" />
-      <div class="row"><label>Gamma</label><output id="outGamma">0.90</output></div>
-      <input id="rangeGamma" type="range" min="0.50" max="2.00" step="0.05" value="0.90" />
-      <div class="row"><label>Contrast</label><output id="outContrast">1.30</output></div>
-      <input id="rangeContrast" type="range" min="0.50" max="2.00" step="0.05" value="1.30" />
-      <div class="row"><label>Black level</label><output id="outBlack">0.05</output></div>
-      <input id="rangeBlack" type="range" min="0.00" max="0.20" step="0.005" value="0.05" />
-    </aside>
-  </div>
-
-  <video id="cam" playsinline></video>
-
 <script>
-(() => {
-  'use strict';
-  // -----------------------------------------------------
-  // Helpers
-  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-  const lerp=(a,b,t)=>a+(b-a)*t;
-  function labelFor(el, out){ el.addEventListener('input', () => out.textContent = el.type==='color' ? el.value : (+el.value).toFixed(el.step && el.step<1 ? String(el.step).split('.')[1].length : 0)); out.textContent = el.value }
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('fluid-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const videoElement = document.getElementById('input-video');
+        const infoText = document.getElementById('info-text');
+        const cameraSelect = document.getElementById('camera-select');
 
-  const canvas=document.getElementById('view');
-  const hud=document.getElementById('hud');
-  const video=document.getElementById('cam');
+        // --- Simulation parameters ---
+        const N = 128; const iter = 4;
+        let dt = 0.1; let diff = 0.000001; let visc = 0.00002;
+        let force = 60; let source = 20; // MODIFICATION: Reduced initial dye amount
+        
+        let showControls = true;
+        const controlsPanel = document.getElementById('controls');
+        const fluid = new Fluid(dt, diff, visc);
+        let pointer = { x: 0, y: 0, dx: 0, dy: 0, down: false };
+        let lastHandPos = { x: 0, y: 0 };
+        let activeColor = [230, 0, 115];
 
-  const ui={
-    res: rangeRes, outRes,
-    scale: rangeScale, outScale,
-    hidpi: chkHidpi, adaptive: chkAdaptive,
-    dt: rangeDt, outDt,
-    iter: rangeIter, outIter,
-    decay: rangeDecay, outDecay,
-    force: rangeForce, outForce,
-    dye: rangeDye, outDye,
-    rad: rangeRad, outRad,
-    palette: document.getElementById('palette'), color: colorPick, outHex,
-    btnPause, btnClearDye, btnSplash, btnPresetSpeed, btnPresetQuality,
-    btnCam, chkHand, chkMotion, chkAlways,
-    motion: rangeMotion, outMotion,
-    smooth: rangeSmooth, outSmooth,
-    sens: rangeSens, outSens,
-    mirror: chkMirror,
-    exp: rangeExp, outExp, gamma: rangeGamma, outGamma, contrast: rangeContrast, outContrast, black: rangeBlack, outBlack
-  };
-  labelFor(ui.res, ui.outRes); labelFor(ui.scale, ui.outScale); labelFor(ui.dt, ui.outDt); labelFor(ui.iter, ui.outIter); labelFor(ui.decay, ui.outDecay);
-  labelFor(ui.force, ui.outForce); labelFor(ui.dye, ui.outDye); labelFor(ui.rad, ui.outRad); labelFor(ui.color, ui.outHex);
-  labelFor(ui.motion, ui.outMotion); labelFor(ui.smooth, ui.outSmooth); labelFor(ui.sens, ui.outSens);
-  labelFor(ui.exp, ui.outExp); labelFor(ui.gamma, ui.outGamma); labelFor(ui.contrast, ui.outContrast); labelFor(ui.black, ui.outBlack);
+        // --- Global variables for camera management ---
+        let activeVideoStream = null;
+        let mediaPipeCamera = null;
 
-  // -----------------------------------------------------
-  // WebGL2 Init
-  const gl = canvas.getContext('webgl2', {alpha:false, antialias:false, preserveDrawingBuffer:false});
-  if(!gl){ hud.textContent='WebGL2 non disponibile. Usa la versione CPU o un browser diverso.'; return; }
-  const ext = gl.getExtension('EXT_color_buffer_float'); // per render su float/half float
-  const supportFloat = !!ext;
+        // --- UI Event Listeners ---
+        document.getElementById('viscosity').addEventListener('input', e => { fluid.visc = parseFloat(e.target.value); });
+        document.getElementById('diffusion').addEventListener('input', e => { fluid.diff = parseFloat(e.target.value); });
+        document.getElementById('force').addEventListener('input', e => { force = parseFloat(e.target.value); });
+        document.getElementById('dye-amount').addEventListener('input', e => { source = parseFloat(e.target.value); });
+        document.getElementById('clear-btn').addEventListener('click', () => fluid.reset());
+        
+        document.querySelectorAll('.color-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                activeColor = JSON.parse(button.dataset.color);
+                document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+            });
+        });
 
-  let dpr=1; function dprCap(){ return ui.hidpi.checked ? Math.min(2, window.devicePixelRatio||1) : 1; }
-  function resizeCanvas(){ dpr=dprCap()*+ui.scale.value; const w=(canvas.clientWidth*dpr)|0; const h=(canvas.clientHeight*dpr)|0; if(!w||!h) return; if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; gl.viewport(0,0,w,h); rebuildTargets(); } }
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'h') {
+                showControls = !showControls;
+                controlsPanel.style.opacity = showControls ? '1' : '0';
+            }
+        });
 
-  // Shader utils
-  function compile(type, src){ const sh=gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){ throw new Error(gl.getShaderInfoLog(sh)||'shader'); } return sh; }
-  function program(vsSrc, fsSrc){ const p=gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc)); gl.linkProgram(p); if(!gl.getProgramParameter(p, gl.LINK_STATUS)){ throw new Error(gl.getProgramInfoLog(p)||'link'); } return p; }
+        cameraSelect.addEventListener('change', () => {
+            startCamera(cameraSelect.value);
+        });
 
-  // Fullscreen triangle
-  const quad=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-  const VS=`#version 300 es
-  precision highp float; layout(location=0) in vec2 a_pos; out vec2 v_uv; void main(){ v_uv=0.5*(a_pos+1.0); gl_Position=vec4(a_pos,0.0,1.0);} `;
+        // --- Hand Tracking Setup ---
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
 
-  // Utility to create targets
-  function makeTex(w,h, internalFormat, format, type){ const tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, w,h,0, format, type, null); return tex; }
-  function makeFBO(tex){ const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0); return fb; }
-  function makeTarget(w,h,internalFormat,format,type){ const tex=makeTex(w,h,internalFormat,format,type); const fb=makeFBO(tex); return {tex, fb, w, h}; }
-  function makeDouble(w,h,internalFormat,format,type){ const a=makeTarget(w,h,internalFormat,format,type); const b=makeTarget(w,h,internalFormat,format,type); return {read:a, write:b, swap(){const t=this.read; this.read=this.write; this.write=t;}} }
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const indexFingerTip = results.multiHandLandmarks[0][8];
+                const newX = 1.0 - indexFingerTip.x;
+                const newY = indexFingerTip.y;
 
-  // Choose formats
-  const IF_VEL = supportFloat ? gl.RG16F : gl.RGBA8;
-  const IF_DYE = supportFloat ? gl.RGBA16F : gl.RGBA8;
-  const IF_SCA = supportFloat ? gl.R16F : gl.RGBA8;
-  const TYPE = supportFloat ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-  const FMT_RG = supportFloat ? gl.RG : gl.RGBA;
-  const FMT_RGBA = gl.RGBA; const FMT_R = supportFloat ? gl.RED : gl.RGBA;
+                pointer.dx = (newX - lastHandPos.x) * force * 2;
+                pointer.dy = (newY - lastHandPos.y) * force * 2;
+                pointer.x = newX;
+                pointer.y = newY;
+                lastHandPos.x = newX;
+                lastHandPos.y = newY;
+                pointer.down = true;
+            } else {
+                pointer.down = false;
+            }
+        }
 
-  // Targets
-  let SIM=128, texel=[1/SIM,1/SIM];
-  let vel, dye, pressure, divergence;
-  function rebuildTargets(){ SIM = +ui.res.value|0; texel=[1/SIM,1/SIM]; vel=makeDouble(SIM,SIM, IF_VEL, FMT_RG, TYPE); dye=makeDouble(SIM,SIM, IF_DYE, FMT_RGBA, TYPE); pressure=makeDouble(SIM,SIM, IF_SCA, FMT_R, TYPE); divergence=makeTarget(SIM,SIM, IF_SCA, FMT_R, TYPE); clearTarget(vel.read, 0,0); clearTarget(vel.write, 0,0); clearTarget(dye.read, 0,0); clearTarget(dye.write, 0,0); clearTarget(pressure.read, 0,0); clearTarget(pressure.write, 0,0); clearTarget(divergence, 0,0); }
+        // --- Camera Management ---
+        async function populateCameraList() {
+            try {
+                await navigator.mediaDevices.getUserMedia({ video: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                const currentDeviceId = activeVideoStream ? activeVideoStream.getVideoTracks()[0].getSettings().deviceId : null;
+                
+                cameraSelect.innerHTML = '';
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${index + 1}`;
+                    if (device.deviceId === currentDeviceId) {
+                        option.selected = true;
+                    }
+                    cameraSelect.appendChild(option);
+                });
+            } catch (err) {
+                console.error("Error enumerating devices:", err);
+                 if (err.name === "NotAllowedError") {
+                    infoText.textContent = "Camera access denied. Please allow camera access and refresh.";
+                }
+            }
+        }
 
-  function bindFS(p){ gl.useProgram(p); gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0); }
-  function draw(){ gl.drawArrays(gl.TRIANGLES,0,3); }
-  function bindTex(unit, tex){ gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex); }
-  function set1i(p,name,val){ gl.uniform1i(gl.getUniformLocation(p,name), val); }
-  function set1f(p,name,val){ gl.uniform1f(gl.getUniformLocation(p,name), val); }
-  function set2f(p,name,a,b){ gl.uniform2f(gl.getUniformLocation(p,name), a,b); }
-  function set3f(p,name,a,b,c){ gl.uniform3f(gl.getUniformLocation(p,name), a,b,c); }
+        async function startCamera(deviceId) {
+            if (activeVideoStream) {
+                activeVideoStream.getTracks().forEach(track => track.stop());
+            }
 
-  // Clear
-  const FS_CLEAR=`#version 300 es
-  precision highp float; out vec4 o; uniform vec2 u_val; void main(){ o=vec4(u_val,0.0,1.0);} `;
-  const P_CLEAR=program(VS,FS_CLEAR);
-  function clearTarget(t, a,b){ gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); bindFS(P_CLEAR); set2f(P_CLEAR,'u_val',a,b); draw(); }
+            const constraints = {
+                video: {
+                    deviceId: deviceId ? { exact: deviceId } : undefined,
+                    width: 640,
+                    height: 480
+                }
+            };
 
-  // Advect
-  const FS_ADVECT=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_x; uniform sampler2D u_vel; uniform float u_dt; uniform float u_N; uniform vec2 u_texel; void main(){ vec2 vel=texture(u_vel,v_uv).xy; vec2 prev = v_uv - (u_dt * vel / u_N); prev = clamp(prev, vec2(u_texel*0.5), vec2(1.0)-vec2(u_texel*0.5)); o = texture(u_x, prev); }`;
-  const P_ADVECT=program(VS,FS_ADVECT);
+            try {
+                activeVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = activeVideoStream;
+                
+                if (!mediaPipeCamera) {
+                    mediaPipeCamera = new Camera(videoElement, {
+                        onFrame: async () => {
+                            await hands.send({ image: videoElement });
+                        },
+                        width: 640,
+                        height: 480
+                    });
+                    mediaPipeCamera.start();
+                }
 
-  // Divergence
-  const FS_DIV=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_vel; uniform float u_N; uniform vec2 u_texel; void main(){ vec2 L=texture(u_vel, v_uv-vec2(u_texel.x,0.)).xy; vec2 R=texture(u_vel, v_uv+vec2(u_texel.x,0.)).xy; vec2 B=texture(u_vel, v_uv-vec2(0.,u_texel.y)).xy; vec2 T=texture(u_vel, v_uv+vec2(0.,u_texel.y)).xy; float div = 0.5*u_N*((R.x-L.x)+(T.y-B.y)); o=vec4(div,0,0,1); }`;
-  const P_DIV=program(VS,FS_DIV);
+                infoText.textContent = "Move your hand to control the fluid. Press 'H' to hide controls.";
+                
+                await populateCameraList();
 
-  // Jacobi (pressure solve): p' = (L+R+T+B - div)/4
-  const FS_JACOBI=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_p; uniform sampler2D u_div; uniform vec2 u_texel; void main(){ float L=texture(u_p, v_uv-vec2(u_texel.x,0.)).r; float R=texture(u_p, v_uv+vec2(u_texel.x,0.)).r; float B=texture(u_p, v_uv-vec2(0.,u_texel.y)).r; float T=texture(u_p, v_uv+vec2(0.,u_texel.y)).r; float div=texture(u_div, v_uv).r; float p=(L+R+B+T - div)*0.25; o=vec4(p,0,0,1); }`;
-  const P_JACOBI=program(VS,FS_JACOBI);
+            } catch (err) {
+                infoText.textContent = "Camera access denied or error. Please check permissions and refresh.";
+                console.error("Error starting camera:", err);
+            }
+        }
 
-  // Subtract gradient
-  const FS_SUBGRAD=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_vel; uniform sampler2D u_p; uniform float u_N; uniform vec2 u_texel; void main(){ float L=texture(u_p, v_uv-vec2(u_texel.x,0.)).r; float R=texture(u_p, v_uv+vec2(u_texel.x,0.)).r; float B=texture(u_p, v_uv-vec2(0.,u_texel.y)).r; float T=texture(u_p, v_uv+vec2(0.,u_texel.y)).r; vec2 grad = vec2(R-L, T-B) * 0.5 * u_N; vec2 v = texture(u_vel, v_uv).xy - grad; o=vec4(v,0,1); }`;
-  const P_SUBGRAD=program(VS,FS_SUBGRAD);
+        // --- Canvas and Rendering ---
+        let offscreenCanvas, offscreenCtx, offscreenImageData;
+        function resizeCanvas() {
+            const dpr = Math.min(window.devicePixelRatio, 2);
+            canvas.width = Math.floor(canvas.clientWidth * dpr);
+            canvas.height = Math.floor(canvas.clientHeight * dpr);
+            const simWidth = N + 2; const simHeight = N + 2;
+            offscreenCanvas = new OffscreenCanvas(simWidth, simHeight);
+            offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+            offscreenImageData = offscreenCtx.createImageData(simWidth, simHeight);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-  // Splat (add force or dye)
-  const FS_SPLAT=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_tex; uniform vec2 u_center; uniform float u_radius; uniform vec3 u_add; void main(){ vec2 d = v_uv - u_center; float r2 = dot(d,d); float k = exp(-r2 / max(1e-6, u_radius*u_radius)); vec4 base = texture(u_tex, v_uv); o = vec4(base.rgb + u_add*k, 1.0); }`;
-  const P_SPLAT=program(VS,FS_SPLAT);
+        function draw() {
+            const data = offscreenImageData.data; const size = N + 2;
+            for (let i = 0; i < size * size; i++) {
+                const dataIndex = i * 4;
+                data[dataIndex] = fluid.r[i]; data[dataIndex + 1] = fluid.g[i]; data[dataIndex + 2] = fluid.b[i]; data[dataIndex + 3] = 255;
+            }
+            offscreenCtx.putImageData(offscreenImageData, 0, 0);
+            ctx.imageSmoothingEnabled = true;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
+        }
 
-  // Fade dye
-  const FS_FADE=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_tex; uniform float u_decay; void main(){ vec4 c = texture(u_tex, v_uv); float k = max(0.0, 1.0 - u_decay); o = vec4(c.rgb*k, 1.0); }`;
-  const P_FADE=program(VS,FS_FADE);
+        // --- Animation Loop ---
+        function animate() {
+            if (pointer.down) {
+                const gridX = Math.floor(pointer.x * (N + 2)); const gridY = Math.floor(pointer.y * (N + 2));
+                const emitterSize = 1; // MODIFICATION: Reduced emitter size
+                for (let i = -emitterSize; i <= emitterSize; i++) {
+                    for (let j = -emitterSize; j <= emitterSize; j++) {
+                        const currentX = gridX + i; const currentY = gridY + j;
+                        if (currentX > 0 && currentX < N + 1 && currentY > 0 && currentY < N + 1) {
+                            fluid.addVelocity(currentX, currentY, pointer.dx, pointer.dy);
+                            fluid.addDensity(currentX, currentY, source, activeColor);
+                        }
+                    }
+                }
+            }
+            fluid.step();
+            draw();
+            requestAnimationFrame(animate);
+        }
+        
+        // --- Initial Start ---
+        startCamera();
+        animate();
 
-  // Blit to screen + tone-map
-  const FS_BLIT=`#version 300 es
-  precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_dye; uniform float u_exp; uniform float u_gamma; uniform float u_contrast; uniform float u_black; float tone(float v){ v = 1.0 - exp(-u_exp * v); v = max(0.0,(v - u_black)) / (1.0 - u_black + 1e-6); v = pow(v, 1.0/max(1e-3,u_gamma)); v = (v - 0.5)*u_contrast + 0.5; return clamp(v,0.0,1.0);} void main(){ vec3 c = texture(u_dye, v_uv).rgb; c = vec3(tone(c.r), tone(c.g), tone(c.b)); o = vec4(c,1.0);} `;
-  const P_BLIT=program(VS,FS_BLIT);
-
-  function advect(target, src, velSrc){ gl.bindFramebuffer(gl.FRAMEBUFFER, target.write.fb); bindFS(P_ADVECT); bindTex(0, src.read.tex); set1i(P_ADVECT,'u_x',0); bindTex(1, velSrc.read.tex); set1i(P_ADVECT,'u_vel',1); set1f(P_ADVECT,'u_dt', +ui.dt.value); set1f(P_ADVECT,'u_N', SIM); set2f(P_ADVECT,'u_texel', texel[0], texel[1]); draw(); target.swap(); }
-  function computeDivergence(){ gl.bindFramebuffer(gl.FRAMEBUFFER, divergence.fb); bindFS(P_DIV); bindTex(0, vel.read.tex); set1i(P_DIV,'u_vel',0); set1f(P_DIV,'u_N', SIM); set2f(P_DIV,'u_texel', texel[0], texel[1]); draw(); }
-  function pressureSolve(){ // clear pressure
-    clearTarget(pressure.read,0,0); clearTarget(pressure.write,0,0);
-    for(let k=0;k<iterEff;k++){ gl.bindFramebuffer(gl.FRAMEBUFFER, pressure.write.fb); bindFS(P_JACOBI); bindTex(0, pressure.read.tex); set1i(P_JACOBI,'u_p',0); bindTex(1, divergence.tex); set1i(P_JACOBI,'u_div',1); set2f(P_JACOBI,'u_texel', texel[0], texel[1]); draw(); pressure.swap(); }
-  }
-  function projectVelocity(){ gl.bindFramebuffer(gl.FRAMEBUFFER, vel.write.fb); bindFS(P_SUBGRAD); bindTex(0, vel.read.tex); set1i(P_SUBGRAD,'u_vel',0); bindTex(1, pressure.read.tex); set1i(P_SUBGRAD,'u_p',1); set1f(P_SUBGRAD,'u_N', SIM); set2f(P_SUBGRAD,'u_texel', texel[0], texel[1]); draw(); vel.swap(); }
-  function fadeDye(){ gl.bindFramebuffer(gl.FRAMEBUFFER, dye.write.fb); bindFS(P_FADE); bindTex(0, dye.read.tex); set1i(P_FADE,'u_tex',0); set1f(P_FADE,'u_decay', +ui.decay.value * +ui.dt.value); draw(); dye.swap(); }
-  function splat(target, isVel, x, y, addX, addY, addZ){ gl.bindFramebuffer(gl.FRAMEBUFFER, target.write.fb); bindFS(P_SPLAT); bindTex(0, target.read.tex); set1i(P_SPLAT,'u_tex',0); set2f(P_SPLAT,'u_center', x, y); set1f(P_SPLAT,'u_radius', (+ui.rad.value)/SIM*3.0); if(isVel) set3f(P_SPLAT,'u_add', addX, addY, 0.0); else set3f(P_SPLAT,'u_add', addX, addY, addZ); draw(); target.swap(); }
-  function blit(){ gl.bindFramebuffer(gl.FRAMEBUFFER, null); bindFS(P_BLIT); bindTex(0, dye.read.tex); set1i(P_BLIT,'u_dye',0); set1f(P_BLIT,'u_exp', +ui.exp.value); set1f(P_BLIT,'u_gamma', +ui.gamma.value); set1f(P_BLIT,'u_contrast', +ui.contrast.value); set1f(P_BLIT,'u_black', +ui.black.value); draw(); }
-
-  // -----------------------------------------------------
-  // Interaction (mouse)
-  let isDown=false, lastX=0, lastY=0; let selColor=[0.25,0.82,1.0];
-  function paletteInit(){ const colors=['#3fd0ff','#ff5ea8','#ffd166','#7cff6b','#9381ff','#ff6b6b','#00e4b8','#ffffff']; colors.forEach((hex,i)=>{ const sw=document.createElement('button'); sw.className='swatch'; sw.style.background=hex; sw.title=hex; sw.addEventListener('click',()=>{ ui.color.value=hex; ui.outHex.textContent=hex; selColor=hexToRgb01(hex); for(const s of ui.palette.querySelectorAll('.swatch')) s.classList.remove('active'); sw.classList.add('active'); }); if(i===0) sw.classList.add('active'); ui.palette.appendChild(sw); }); ui.color.addEventListener('input',()=>{ selColor=hexToRgb01(ui.color.value); for(const s of ui.palette.querySelectorAll('.swatch')) s.classList.remove('active'); }); }
-  function hexToRgb01(hex){ const v=hex.replace('#',''); return [parseInt(v.slice(0,2),16)/255, parseInt(v.slice(2,4),16)/255, parseInt(v.slice(4,6),16)/255]; }
-  function getUV(e){ const rect=canvas.getBoundingClientRect(); const x=(e.clientX-rect.left)*dpr/canvas.width; const y=(e.clientY-rect.top)*dpr/canvas.height; return [clamp(x,0,1), clamp(y,0,1)]; }
-  function onDown(e){ isDown=true; const [u,v]=getUV(e); lastX=u; lastY=v; }
-  function onMove(e){ if(!isDown) return; const [u,v]=getUV(e); const du=u-lastX, dv=v-lastY; lastX=u; lastY=v; const f=+ui.force.value/200; const amt=+ui.dye.value; splat(vel,true,u,1.0-v, du*f*SIM, -dv*f*SIM, 0); splat(dye,false,u,1.0-v, amt*selColor[0], amt*selColor[1], amt*selColor[2]); }
-  function onUp(){ isDown=false; }
-  canvas.addEventListener('pointerdown', onDown); window.addEventListener('pointerup', onUp); window.addEventListener('pointermove', onMove);
-
-  // -----------------------------------------------------
-  // Hand tracking (MediaPipe)
-  let camRunning=false, hands=null, camObj=null;
-  async function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Failed '+src)); document.head.appendChild(s); }); }
-  async function ensureMediapipe(){ if(window.Hands && window.Camera) return; await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js'); await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'); }
-  function normDist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
-  function onHandsResults(res){ if(!ui.chkHand.checked) return; if(!res.multiHandLandmarks||!res.multiHandLandmarks.length) return; const lm=res.multiHandLandmarks[0]; let x=lm[8].x, y=lm[8].y; if(ui.mirror.checked) x=1-x; const targetU=x, targetV=y; const s=+ui.smooth.value; if(typeof onHandsResults.u==='undefined'){ onHandsResults.u=targetU; onHandsResults.v=targetV; onHandsResults.pu=targetU; onHandsResults.pv=targetV; }
-    const u=onHandsResults.u=lerp(onHandsResults.u,targetU,1-s); const v=onHandsResults.v=lerp(onHandsResults.v,targetV,1-s);
-    const duPx=(u-onHandsResults.pu)*canvas.width; const dvPx=(v-onHandsResults.pv)*canvas.height; const speed=Math.hypot(duPx,dvPx);
-    const mode = ui.chkAlways.checked ? 'always' : (ui.chkMotion.checked ? 'motion' : 'off'); const thresh=+ui.motion.value; let draw=false; if(mode==='always') draw=true; else if(mode==='motion') draw = speed>thresh;
-    if(draw){ const sens=+ui.sens.value; const f=+ui.force.value/200*sens; const amt=+ui.dye.value; const du=(u-onHandsResults.pu); const dv=(v-onHandsResults.pv);
-      splat(vel,true,u,1.0-v, du*f*SIM, -dv*f*SIM, 0);
-      splat(dye,false,u,1.0-v, amt*selColor[0], amt*selColor[1], amt*selColor[2]); }
-    onHandsResults.pu=u; onHandsResults.pv=v; }
-  async function startCamera(){ if(camRunning) return; await ensureMediapipe(); hands=new Hands({ locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` }); hands.setOptions({ maxNumHands:1, modelComplexity:1, selfieMode:true, minDetectionConfidence:0.6, minTrackingConfidence:0.6 }); hands.onResults(onHandsResults); camObj=new Camera(video,{ width:640,height:480,onFrame: async ()=>{ await hands.send({ image: video }); } }); await camObj.start(); camRunning=true; ui.btnCam.textContent='🛑 Stop camera'; updateHud(); }
-  function stopCamera(){ if(!camRunning) return; try{ camObj.stop && camObj.stop(); }catch(e){} try{ const s=video.srcObject; if(s) s.getTracks().forEach(t=>t.stop()); }catch(e){} camRunning=false; ui.btnCam.textContent='📷 Avvia camera'; updateHud(); }
-
-  // -----------------------------------------------------
-  // Simulation Loop
-  let paused=false, lastT=performance.now(), acc=0, frames=0, fps=60, iterEff=+ui.iter.value|0;
-  function step(){ advect(vel, vel, vel); computeDivergence(); pressureSolve(); projectVelocity(); advect(dye, dye, vel); fadeDye(); }
-  function tick(t){ if(!paused) step(); blit(); frames++; acc += (t-lastT); lastT=t; if(acc>500){ const fpsNow = frames*1000/acc; fps=fpsNow; frames=0; acc=0; if(ui.adaptive.checked){ if(fpsNow<55) iterEff=Math.max(10, iterEff-1); else if(fpsNow>65) iterEff=Math.min((+ui.iter.value|0), iterEff+1); } updateHud(); } requestAnimationFrame(tick); }
-  function updateHud(){ hud.innerHTML=`FPS ${fps.toFixed(0)} • SIM ${SIM}² • iters ${iterEff}${ui.adaptive.checked? ' (adaptive)':''} • dt ${(+ui.dt.value).toFixed(3)}<br>`+`cam ${camRunning?'on':'off'} • hand ${ui.chkHand.checked?'on':'off'} • mode ${ui.chkAlways.checked?'always':(ui.chkMotion.checked?'motion':'off')}`; }
-
-  // -----------------------------------------------------
-  // Controls
-  ui.btnPause.addEventListener('click', ()=>{ paused=!paused; ui.btnPause.textContent = paused? '▶ Riprendi':'⏯ Pausa'; });
-  ui.btnClearDye.addEventListener('click', ()=>{ clearTarget(dye.read,0,0); clearTarget(dye.write,0,0); });
-  ui.btnSplash.addEventListener('click', ()=>{ for(let k=0;k<10;k++){ const u=Math.random(), v=Math.random(); const f=(Math.random()-.5)*0.6*SIM; const amt=2+Math.random()*8; const col=hexToRgb01(['#3fd0ff','#ff5ea8','#ffd166','#7cff6b','#9381ff','#ff6b6b','#00e4b8','#ffffff'][Math.random()*8|0]); splat(vel,true,u,v,(Math.random()-.5)*f,(Math.random()-.5)*f,0); splat(dye,false,u,v,amt*col[0],amt*col[1],amt*col[2]); } });
-  ui.btnPresetSpeed.addEventListener('click', ()=>{ ui.res.value=96; ui.iter.value=24; iterEff=24; ui.scale.value=0.7; ui.hidpi.checked=false; labelFor(ui.res, ui.outRes); labelFor(ui.iter, ui.outIter); labelFor(ui.scale, ui.outScale); resizeCanvas(); rebuildTargets(); updateHud(); });
-  ui.btnPresetQuality.addEventListener('click', ()=>{ ui.res.value=192; ui.iter.value=48; iterEff=48; ui.scale.value=1.0; ui.hidpi.checked=true; labelFor(ui.res, ui.outRes); labelFor(ui.iter, ui.outIter); labelFor(ui.scale, ui.outScale); resizeCanvas(); rebuildTargets(); updateHud(); });
-  ui.res.addEventListener('change', ()=>{ rebuildTargets(); updateHud(); });
-  ui.iter.addEventListener('input', ()=>{ if(!ui.adaptive.checked) iterEff=+ui.iter.value|0; });
-  ui.btnCam.addEventListener('click', ()=>{ camRunning? stopCamera(): startCamera(); });
-
-  window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); ui.btnPause.click(); } });
-
-  // -----------------------------------------------------
-  // Boot
-  paletteInit();
-  const ro=new ResizeObserver(()=>resizeCanvas()); ro.observe(canvas);
-  resizeCanvas(); rebuildTargets(); updateHud();
-  // kick visivo
-  for(let k=0;k<6;k++){ const u=Math.random(), v=Math.random(); const f=(Math.random()-.5)*0.4*SIM; const amt=2+Math.random()*6; const col=hexToRgb01(['#3fd0ff','#ff5ea8','#ffd166','#7cff6b','#9381ff','#ff6b6b','#00e4b8','#ffffff'][Math.random()*8|0]); splat(vel,true,u,v,(Math.random()-.5)*f,(Math.random()-.5)*f,0); splat(dye,false,u,v,amt*col[0],amt*col[1],amt*col[2]); }
-  requestAnimationFrame(tick);
-})();
+        // --- Fluid Solver (minified for brevity) ---
+        function Fluid(dt, diff, visc) {
+            this.size = N; this.dt = dt; this.diff = diff; this.visc = visc; this.iter = iter;
+            this.reset = function() {
+                const n = (N + 2) * (N + 2);
+                this.Vx = new Float32Array(n).fill(0); this.Vy = new Float32Array(n).fill(0);
+                this.Vx0 = new Float32Array(n).fill(0); this.Vy0 = new Float32Array(n).fill(0);
+                this.r = new Float32Array(n).fill(0); this.g = new Float32Array(n).fill(0); this.b = new Float32Array(n).fill(0);
+                this.r0 = new Float32Array(n).fill(0); this.g0 = new Float32Array(n).fill(0); this.b0 = new Float32Array(n).fill(0);
+            }
+            this.reset();
+            this.addDensity = function(x, y, amount, color) {
+                this.r[IX(x, y)] += (color[0] / 255) * amount; this.g[IX(x, y)] += (color[1] / 255) * amount; this.b[IX(x, y)] += (color[2] / 255) * amount;
+            };
+            this.addVelocity = function(x, y, amountX, amountY) {
+                this.Vx[IX(x, y)] += amountX; this.Vy[IX(x, y)] += amountY;
+            };
+            this.step = function() {
+                diffuse(1, this.Vx0, this.Vx, this.visc, this.dt, this.iter, this.size); diffuse(2, this.Vy0, this.Vy, this.visc, this.dt, this.iter, this.size);
+                project(this.Vx0, this.Vy0, this.Vx, this.Vy, this.iter, this.size);
+                advect(1, this.Vx, this.Vx0, this.Vx0, this.Vy0, this.dt, this.size); advect(2, this.Vy, this.Vy0, this.Vx0, this.Vy0, this.dt, this.size);
+                project(this.Vx, this.Vy, this.Vx0, this.Vy0, this.iter, this.size);
+                diffuse(0, this.r0, this.r, this.diff, this.dt, this.iter, this.size); diffuse(0, this.g0, this.g, this.diff, this.dt, this.iter, this.size); diffuse(0, this.b0, this.b, this.diff, this.dt, this.iter, this.size);
+                advect(0, this.r, this.r0, this.Vx, this.Vy, this.dt, this.size); advect(0, this.g, this.g0, this.Vx, this.Vy, this.dt, this.size); advect(0, this.b, this.b0, this.Vx, this.Vy, this.dt, this.size);
+            };
+        }
+        function IX(x, y) { return x + y * (N + 2); }
+        function set_bnd(b, x, N) { for (let i = 1; i <= N; i++) { x[IX(0, i)] = b === 1 ? -x[IX(1, i)] : x[IX(1, i)]; x[IX(N + 1, i)] = b === 1 ? -x[IX(N, i)] : x[IX(N, i)]; x[IX(i, 0)] = b === 2 ? -x[IX(i, 1)] : x[IX(i, 1)]; x[IX(i, N + 1)] = b === 2 ? -x[IX(i, N)] : x[IX(i, N)]; } x[IX(0, 0)] = 0.5 * (x[IX(1, 0)] + x[IX(0, 1)]); x[IX(0, N + 1)] = 0.5 * (x[IX(1, N + 1)] + x[IX(0, N)]); x[IX(N + 1, 0)] = 0.5 * (x[IX(N, 0)] + x[IX(N + 1, 1)]); x[IX(N + 1, N + 1)] = 0.5 * (x[IX(N, N + 1)] + x[IX(N + 1, N)]); }
+        function lin_solve(b, x, x0, a, c, iter, N) { const cRecip = 1.0 / c; for (let k = 0; k < iter; k++) { for (let j = 1; j <= N; j++) { for (let i = 1; i <= N; i++) { x[IX(i, j)] = (x0[IX(i, j)] + a * (x[IX(i + 1, j)] + x[IX(i - 1, j)] + x[IX(i, j + 1)] + x[IX(i, j - 1)])) * cRecip; } } set_bnd(b, x, N); } }
+        function diffuse(b, x, x0, diff, dt, iter, N) { const a = dt * diff * (N * N); lin_solve(b, x, x0, a, 1 + 4 * a, iter, N); }
+        function advect(b, d, d0, velocX, velocY, dt, N) { let i0, i1, j0, j1; const dtx = dt * N; const dty = dt * N; let s0, s1, t0, t1; let tmp1, tmp2, x, y; for (let j = 1; j <= N; j++) { for (let i = 1; i <= N; i++) { tmp1 = dtx * velocX[IX(i, j)]; tmp2 = dty * velocY[IX(i, j)]; x = i - tmp1; y = j - tmp2; if (x < 0.5) x = 0.5; if (x > N + 0.5) x = N + 0.5; i0 = Math.floor(x); i1 = i0 + 1; if (y < 0.5) y = 0.5; if (y > N + 0.5) y = N + 0.5; j0 = Math.floor(y); j1 = j0 + 1; s1 = x - i0; s0 = 1 - s1; t1 = y - j0; t0 = 1 - t1; d[IX(i, j)] = s0 * (t0 * d0[IX(i0, j0)] + t1 * d0[IX(i0, j1)]) + s1 * (t0 * d0[IX(i1, j0)] + t1 * d0[IX(i1, j1)]); } } set_bnd(b, d, N); }
+        function project(velocX, velocY, p, div, iter, N) { for (let j = 1; j <= N; j++) { for (let i = 1; i <= N; i++) { div[IX(i, j)] = -0.5 * (velocX[IX(i + 1, j)] - velocX[IX(i - 1, j)] + velocY[IX(i, j + 1)] - velocY[IX(i, j - 1)]) / N; p[IX(i, j)] = 0; } } set_bnd(0, div, N); set_bnd(0, p, N); lin_solve(0, p, div, 1, 4, iter, N); for (let j = 1; j <= N; j++) { for (let i = 1; i <= N; i++) { velocX[IX(i, j)] -= 0.5 * (p[IX(i + 1, j)] - p[IX(i - 1, j)]) * N; velocY[IX(i, j)] -= 0.5 * (p[IX(i, j + 1)] - p[IX(i, j - 1)]) * N; } } set_bnd(1, velocX, N); set_bnd(2, velocY, N); }
+    });
 </script>
+
 </body>
 </html>
