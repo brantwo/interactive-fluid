@@ -1,34 +1,41 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Interactive Fluid Dynamics — High Contrast</title>
+  <title>Interactive Fluid Dynamics – Standalone</title>
   <style>
-    :root{ --bg:#0b0f14; --panel:#121821; --muted:#99a3ad; --accent:#3fd0ff; }
+    :root{
+      --bg:#0b0f14; --panel:#121821; --muted:#99a3ad; --accent:#3fd0ff; --accent2:#ffa94d;
+    }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;background:var(--bg);color:#e8eef6;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial}
-    .wrap{display:grid;grid-template-columns:1fr 400px;gap:12px;height:100%;padding:12px}
-    .canvasWrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid #1f2a36;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-    canvas{display:block;width:100%;height:100%;background:#05070a}
-    .hud{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border:1px solid #1f2a36;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.25}
-    .cursor{position:absolute;width:14px;height:14px;border:2px solid #ffffffaa;border-radius:50%;left:-1000px;top:-1000px;pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:screen;box-shadow:0 0 10px #ffffff55;transition:opacity .12s ease}
+    .wrap{display:grid;grid-template-columns:1fr 380px;grid-template-rows:1fr;gap:12px;height:100vh;padding:12px}
+    .canvasWrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid #1f2a36;box-shadow:0 10px 30px rgba(0,0,0,.35);min-height:400px}
+    canvas{display:block;width:100%;height:100%;background:#05070a;image-rendering:auto}
+    .hud{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border:1px solid #1f2a36;color:#d7e2ee;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.25}
+    .cursor{position:absolute;width:14px;height:14px;border:2px solid #ffffffaa;border-radius:50%;left:-1000px;top:-1000px;pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:screen;box-shadow:0 0 10px #ffffff55}
     .sidebar{background:var(--panel);border:1px solid #1f2a36;border-radius:14px;padding:14px 14px 10px;overflow:auto}
-    h1{font-size:18px;margin:0 0 8px;color:#eef6ff}
-    h2{font-size:13px;font-weight:600;margin:16px 0 6px;color:#cfe3ff}
-    .row{display:grid;grid-template-columns:1fr 92px;gap:8px;align-items:center;margin:6px 0}
+    h1{font-size:18px;margin:0 0 8px 0;color:#eef6ff}
+    h2{font-size:13px;font-weight:600;margin:16px 0 6px;color:#cfe3ff;letter-spacing:.2px}
+    .row{display:grid;grid-template-columns:1fr 76px;gap:8px;align-items:center;margin:6px 0}
     .row input[type=range]{width:100%}
     .row output{justify-self:end;font-variant-numeric:tabular-nums;color:#d1deef}
+    .controls{display:grid;grid-template-columns:1fr;gap:6px}
     .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
     button{background:#182232;border:1px solid #233145;color:#e7f0fb;padding:7px 10px;border-radius:10px;cursor:pointer}
     button:hover{background:#1c2a3f}
     .palette{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 2px}
-    .swatch{width:26px;height:26px;border-radius:6px;border:2px solid #1b2533;cursor:pointer}
+    .swatch{width:26px;height:26px;border-radius:6px;border:2px solid #1b2533;cursor:pointer;position:relative}
     .swatch.active{outline:2px solid #fff;outline-offset:2px}
+    .help{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.35}
+    .kbd{background:#0b1220;border:1px solid #223049;border-radius:6px;padding:1px 6px;font-size:11px}
+    .footer{margin-top:12px;border-top:1px solid #1f2a36;padding-top:8px;color:#9fb1c5;font-size:12px}
+    .link{color:#9fd5ff}
     .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:#cde1fb}
     .toggle input{transform:translateY(1px)}
     video#cam{display:none}
-    @media (max-width:980px){.wrap{grid-template-columns:1fr}}
+    @media (max-width:980px){.wrap{grid-template-columns:1fr}} 
   </style>
 </head>
 <body>
@@ -38,74 +45,73 @@
       <div class="hud" id="hud"></div>
       <div class="cursor" id="cursor"></div>
     </div>
-
     <aside class="sidebar">
       <h1>Fluid Dynamics (Stable Fluids)</h1>
+      <div class="controls">
+        <h2>Resolution</h2>
+        <div class="row">
+          <label>Grid size <small class="muted">(recreates sim)</small></label>
+          <output id="outN">128</output>
+        </div>
+        <input id="rangeN" type="range" min="48" max="256" step="16" value="128" />
 
-      <h2>Resolution</h2>
-      <div class="row"><label>Grid size</label><output id="outN">128</output></div>
-      <input id="rangeN" type="range" min="48" max="256" step="16" value="128" />
-      <div class="row"><label>Render scale</label><output id="outScale">0.80</output></div>
-      <input id="rangeScale" type="range" min="0.40" max="1.00" step="0.05" value="0.80" />
-      <label class="toggle"><input id="chkHidpi" type="checkbox" checked/> HiDPI (sharper, slower)</label>
-      <label class="toggle"><input id="chkAdaptive" type="checkbox" checked/> Adaptive iterations</label>
+        <div class="row"><label>Render scale</label><output id="outScale">0.80</output></div>
+        <input id="rangeScale" type="range" min="0.40" max="1.00" step="0.05" value="0.80" />
+        <label class="toggle"><input id="chkHidpi" type="checkbox" checked/> HiDPI (sharper, slower)</label>
+        <label class="toggle"><input id="chkAdaptive" type="checkbox" checked/> Adaptive iterations</label>
 
-      <h2>Physics</h2>
-      <div class="row"><label>Δt</label><output id="outDt">0.016</output></div>
-      <input id="rangeDt" type="range" min="0.005" max="0.06" step="0.001" value="0.016" />
-      <div class="row"><label>Viscosity</label><output id="outVisc">0.0008</output></div>
-      <input id="rangeVisc" type="range" min="0" max="0.01" step="0.0001" value="0.0008" />
-      <div class="row"><label>Diffusion</label><output id="outDiff">0.0002</output></div>
-      <input id="rangeDiff" type="range" min="0" max="0.003" step="0.0001" value="0.0002" />
-      <div class="row"><label>Jacobi iters</label><output id="outIter">30</output></div>
-      <input id="rangeIter" type="range" min="10" max="120" step="2" value="30" />
-      <div class="row"><label>Dye decay</label><output id="outDecay">0.10</output></div>
-      <input id="rangeDecay" type="range" min="0" max="1" step="0.01" value="0.10" />
+        <h2>Physics</h2>
+        <div class="row"><label>Δt</label><output id="outDt">0.016</output></div>
+        <input id="rangeDt" type="range" min="0.005" max="0.06" step="0.001" value="0.016" />
+        <div class="row"><label>Viscosity</label><output id="outVisc">0.0008</output></div>
+        <input id="rangeVisc" type="range" min="0" max="0.01" step="0.0001" value="0.0008" />
+        <div class="row"><label>Diffusion</label><output id="outDiff">0.0002</output></div>
+        <input id="rangeDiff" type="range" min="0" max="0.003" step="0.0001" value="0.0002" />
+        <div class="row"><label>Jacobi iters</label><output id="outIter">30</output></div>
+        <input id="rangeIter" type="range" min="10" max="120" step="2" value="30" />
+        <div class="row"><label>Dye decay</label><output id="outDecay">0.10</output></div>
+        <input id="rangeDecay" type="range" min="0" max="1" step="0.01" value="0.10" />
 
-      <h2>Brush</h2>
-      <div class="row"><label>Force</label><output id="outForce">60</output></div>
-      <input id="rangeForce" type="range" min="0" max="200" step="1" value="60" />
-      <div class="row"><label>Dye amount</label><output id="outDye">3.0</output></div>
-      <input id="rangeDye" type="range" min="0" max="15" step="0.1" value="3.0" />
-      <div class="row"><label>Radius</label><output id="outRad">8</output></div>
-      <input id="rangeRad" type="range" min="1" max="40" step="1" value="8" />
+        <h2>Brush</h2>
+        <div class="row"><label>Force</label><output id="outForce">60</output></div>
+        <input id="rangeForce" type="range" min="0" max="200" step="1" value="60" />
+        <div class="row"><label>Dye amount</label><output id="outDye">3.0</output></div>
+        <input id="rangeDye" type="range" min="0" max="15" step="0.1" value="3.0" />
+        <div class="row"><label>Radius</label><output id="outRad">8</output></div>
+        <input id="rangeRad" type="range" min="1" max="40" step="1" value="8" />
 
-      <h2>Color</h2>
-      <div class="palette" id="palette"></div>
-      <div class="row"><label>Custom</label><output id="outHex">#3fd0ff</output></div>
-      <input id="colorPick" type="color" value="#3fd0ff" />
+        <h2>Color</h2>
+        <div class="palette" id="palette"></div>
+        <div class="row"><label>Custom</label><output id="outHex">#3fd0ff</output></div>
+        <input id="colorPick" type="color" value="#3fd0ff" />
 
-      <div class="btns">
-        <button id="btnPause" title="Space">⏯ Pause</button>
-        <button id="btnClearDye">🧼 Clear dye</button>
-        <button id="btnClearVel">💨 Clear velocity</button>
-        <button id="btnSplash">✨ Splash</button>
-        <button id="btnPresetSpeed">⚡ Speed</button>
-        <button id="btnPresetQuality">🎨 Quality</button>
-        <button id="btnInvert">🧽 Erase: Off</button>
-      </div>
+        <div class="btns">
+          <button id="btnPause" title="Space">⏯ Pause</button>
+          <button id="btnClearDye">🧼 Clear dye</button>
+          <button id="btnClearVel">💨 Clear velocity</button>
+          <button id="btnSplash">✨ Splash</button>
+          <button id="btnPresetSpeed">⚡ Speed</button>
+          <button id="btnPresetQuality">🎨 Quality</button>
+          <button id="btnInvert">🧽 Erase: Off</button>
+        </div>
 
-      <h2>Hand Control (Webcam)</h2>
-      <div class="btns"><button id="btnCam">📷 Start camera</button></div>
-      <label class="toggle"><input id="chkHand" type="checkbox"> Use hand to draw (pinch)</label>
-      <div class="row"><label>Smoothing</label><output id="outSmooth">0.40</output></div>
-      <input id="rangeSmooth" type="range" min="0" max="0.95" step="0.05" value="0.40" />
-      <div class="row"><label>Sensitivity</label><output id="outSens">1.00</output></div>
-      <input id="rangeSens" type="range" min="0.20" max="3.00" step="0.05" value="1.00" />
-      <label class="toggle"><input id="chkMirror" type="checkbox" checked> Mirror</label>
+        <h2>Hand Control (Webcam)</h2>
+        <div class="btns">
+          <button id="btnCam">📷 Start camera</button>
+        </div>
+        <label class="toggle"><input id="chkHand" type="checkbox"> Use hand to draw (pinch)</label>
+        <div class="row"><label>Smoothing</label><output id="outSmooth">0.40</output></div>
+        <input id="rangeSmooth" type="range" min="0" max="0.95" step="0.05" value="0.40" />
+        <div class="row"><label>Sensitivity</label><output id="outSens">1.00</output></div>
+        <input id="rangeSens" type="range" min="0.20" max="3.00" step="0.05" value="1.00" />
+        <label class="toggle"><input id="chkMirror" type="checkbox" checked> Mirror</label>
 
-      <h2>Display</h2>
-      <div class="row"><label>Exposure</label><output id="outExp">1.80</output></div>
-      <input id="rangeExp" type="range" min="0.50" max="4.00" step="0.05" value="1.80" />
-      <div class="row"><label>Gamma</label><output id="outGamma">0.90</output></div>
-      <input id="rangeGamma" type="range" min="0.50" max="2.00" step="0.05" value="0.90" />
-      <div class="row"><label>Contrast</label><output id="outContrast">1.25</output></div>
-      <input id="rangeContrast" type="range" min="0.50" max="2.00" step="0.05" value="1.25" />
-      <div class="row"><label>Black level</label><output id="outBlack">0.04</output></div>
-      <input id="rangeBlack" type="range" min="0.00" max="0.20" step="0.005" value="0.04" />
+        <div class="help">
+          <div><span class="kbd">Drag</span> or <span class="kbd">Pinch</span> to add velocity & dye. <span class="kbd">Right‑click</span> or <span class="kbd">Erase</span> to remove.</div>
+          <div><span class="kbd">Space</span> pause • <span class="kbd">C</span> clear dye • <span class="kbd">V</span> clear velocity • <span class="kbd">R</span> random splash</div>
+        </div>
 
-      <div class="help">
-        <div><span class="kbd">Tip</span>: per più contrasto aumenta <b>Exposure</b> e <b>Contrast</b>, abbassa <b>Gamma</b> e alza un po' il <b>Black level</b>.</div>
+        <div class="footer">Built with Jos Stam's <em>Stable Fluids</em> (CPU). Webcam hand tracking via MediaPipe (loaded on demand). ✨</div>
       </div>
     </aside>
   </div>
@@ -115,10 +121,12 @@
 <script>
 (() => {
   'use strict';
+  // ---------- Utility ----------
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const lerp = (a,b,t)=>a+(b-a)*t;
   function labelFor(el, out){ el.addEventListener('input', () => out.textContent = el.type==='color' ? el.value : (+el.value).toFixed(el.step && el.step<1 ? String(el.step).split('.')[1].length : 0)); out.textContent = el.value }
 
+  // ---------- DOM ----------
   const canvas = document.getElementById('view');
   const hud = document.getElementById('hud');
   const cursor = document.getElementById('cursor');
@@ -126,173 +134,401 @@
   const dprCap = () => (ui.hidpi.checked ? Math.min(2, window.devicePixelRatio || 1) : 1);
 
   const ui = {
-    N: rangeN, outN,
-    scale: rangeScale, outScale,
-    hidpi: chkHidpi, adaptive: chkAdaptive,
-    dt: rangeDt, outDt,
-    visc: rangeVisc, outVisc,
-    diff: rangeDiff, outDiff,
-    iter: rangeIter, outIter,
-    decay: rangeDecay, outDecay,
-    force: rangeForce, outForce,
-    dyeAmt: rangeDye, outDye,
-    rad: rangeRad, outRad,
-    palette: document.getElementById('palette'), color: colorPick, outHex,
-    btnPause, btnClearDye, btnClearVel, btnSplash, btnPresetSpeed, btnPresetQuality, btnInvert,
-    btnCam, chkHand,
-    smooth: rangeSmooth, outSmooth,
-    sens: rangeSens, outSens,
-    mirror: chkMirror,
-    exp: rangeExp, outExp,
-    gamma: rangeGamma, outGamma,
-    contrast: rangeContrast, outContrast,
-    black: rangeBlack, outBlack
+    N: document.getElementById('rangeN'), outN: document.getElementById('outN'),
+    scale: document.getElementById('rangeScale'), outScale: document.getElementById('outScale'),
+    hidpi: document.getElementById('chkHidpi'), adaptive: document.getElementById('chkAdaptive'),
+    dt: document.getElementById('rangeDt'), outDt: document.getElementById('outDt'),
+    visc: document.getElementById('rangeVisc'), outVisc: document.getElementById('outVisc'),
+    diff: document.getElementById('rangeDiff'), outDiff: document.getElementById('outDiff'),
+    iter: document.getElementById('rangeIter'), outIter: document.getElementById('outIter'),
+    decay: document.getElementById('rangeDecay'), outDecay: document.getElementById('outDecay'),
+    force: document.getElementById('rangeForce'), outForce: document.getElementById('outForce'),
+    dyeAmt: document.getElementById('rangeDye'), outDye: document.getElementById('outDye'),
+    rad: document.getElementById('rangeRad'), outRad: document.getElementById('outRad'),
+    palette: document.getElementById('palette'), color: document.getElementById('colorPick'), outHex: document.getElementById('outHex'),
+    btnPause: document.getElementById('btnPause'), btnClearDye: document.getElementById('btnClearDye'), btnClearVel: document.getElementById('btnClearVel'), btnSplash: document.getElementById('btnSplash'), btnPresetSpeed: document.getElementById('btnPresetSpeed'), btnPresetQuality: document.getElementById('btnPresetQuality'), btnInvert: document.getElementById('btnInvert'),
+    btnCam: document.getElementById('btnCam'), chkHand: document.getElementById('chkHand'),
+    smooth: document.getElementById('rangeSmooth'), outSmooth: document.getElementById('outSmooth'),
+    sens: document.getElementById('rangeSens'), outSens: document.getElementById('outSens'),
+    mirror: document.getElementById('chkMirror')
   };
   labelFor(ui.N, ui.outN); labelFor(ui.scale, ui.outScale); labelFor(ui.dt, ui.outDt); labelFor(ui.visc, ui.outVisc); labelFor(ui.diff, ui.outDiff);
   labelFor(ui.iter, ui.outIter); labelFor(ui.decay, ui.outDecay); labelFor(ui.force, ui.outForce); labelFor(ui.dyeAmt, ui.outDye); labelFor(ui.rad, ui.outRad); labelFor(ui.color, ui.outHex);
   labelFor(ui.smooth, ui.outSmooth); labelFor(ui.sens, ui.outSens);
-  labelFor(ui.exp, ui.outExp); labelFor(ui.gamma, ui.outGamma); labelFor(ui.contrast, ui.outContrast); labelFor(ui.black, ui.outBlack);
 
-  // ---------- Palette ----------
-  let selColor = [0.25, 0.82, 1.0];
-  const paletteColors = ['#3fd0ff','#ff5ea8','#ffd166','#7cff6b','#9381ff','#ff6b6b','#00e4b8','#ffffff'];
-  function setActiveSwatch(el){ for (const s of ui.palette.querySelectorAll('.swatch')) s.classList.remove('active'); if (el) el.classList.add('active'); }
-  function hexToRgb01(hex){ const v = hex.replace('#',''); return [parseInt(v.substring(0,2),16)/255, parseInt(v.substring(2,4),16)/255, parseInt(v.substring(4,6),16)/255]; }
-  paletteColors.forEach((hex, i) => { const sw=document.createElement('button'); sw.className='swatch'; sw.style.background=hex; sw.title=hex; sw.addEventListener('click',()=>{ ui.color.value=hex; ui.outHex.textContent=hex; selColor=hexToRgb01(hex); setActiveSwatch(sw); }); if(i===0) setActiveSwatch(sw); ui.palette.appendChild(sw); });
-  ui.color.addEventListener('input',()=>{ selColor=hexToRgb01(ui.color.value); setActiveSwatch(null); });
-
-  // ---------- Fluid (CPU Stable Fluids) ----------
-  let N = +ui.N.value|0, size, IX;
+  // ---------- Fluid (Stable Fluids on CPU) ----------
+  let N = +ui.N.value|0, size, IX; // N*N grid (interior), arrays sized (N+2)^2 with borders
   let u, v, u0, v0, densR, densG, densB, d0R, d0G, d0B, p, div;
-  function alloc(){ size=(N+2)*(N+2); IX=(i,j)=> i + (N+2)*j; const F32=Float32Array; u=new F32(size); v=new F32(size); u0=new F32(size); v0=new F32(size); densR=new F32(size); densG=new F32(size); densB=new F32(size); d0R=new F32(size); d0G=new F32(size); d0B=new F32(size); p=new F32(size); div=new F32(size); }
-  function set_bnd(b,x){ const Np1=N+1; for(let i=1;i<=N;i++){ x[IX(0,i)]= b===1?-x[IX(1,i)]:x[IX(1,i)]; x[IX(Np1,i)]= b===1?-x[IX(N,i)]:x[IX(N,i)]; x[IX(i,0)]= b===2?-x[IX(i,1)]:x[IX(i,1)]; x[IX(i,Np1)]= b===2?-x[IX(i,N)]:x[IX(i,N)]; } x[IX(0,0)]=.5*(x[IX(1,0)]+x[IX(0,1)]); x[IX(0,Np1)]=.5*(x[IX(1,Np1)]+x[IX(0,N)]); x[IX(Np1,0)]=.5*(x[IX(N,0)]+x[IX(Np1,1)]); x[IX(Np1,Np1)]=.5*(x[IX(N,Np1)]+x[IX(Np1,N)]); }
-  function add_source(x,s,dt){ for(let i=0;i<x.length;i++) x[i]+=dt*s[i]; }
-  function lin_solve(b,x,x0,a,c,it){ const cInv=1/c; for(let k=0;k<it;k++){ for(let j=1;j<=N;j++){ const row=(N+2)*j; for(let i=1;i<=N;i++){ x[row+i]=(x0[row+i]+a*(x[row+i-1]+x[row+i+1]+x[row+i-(N+2)]+x[row+i+(N+2)]))*cInv; } } set_bnd(b,x); } }
-  function diffuse(b,x,x0,diff,dt,it){ const a=dt*diff*N*N; lin_solve(b,x,x0,a,1+4*a,it); }
-  function advect(b,d,d0,u,v,dt){ const dt0x=dt*N, dt0y=dt*N; for(let j=1;j<=N;j++){ for(let i=1;i<=N;i++){ let x=i-dt0x*u[IX(i,j)], y=j-dt0y*v[IX(i,j)]; x=clamp(x,.5,N+.5); y=clamp(y,.5,N+.5); const i0=x|0, i1=i0+1, j0=y|0, j1=j0+1; const s1=x-i0, s0=1-s1, t1=y-j0, t0=1-t1; d[IX(i,j)]= s0*(t0*d0[IX(i0,j0)] + t1*d0[IX(i0,j1)]) + s1*(t0*d0[IX(i1,j0)] + t1*d0[IX(i1,j1)]); } } set_bnd(b,d); }
-  function project(u,v,p,div,it){ const h=1/N; for(let j=1;j<=N;j++){ for(let i=1;i<=N;i++){ div[IX(i,j)]= -.5*h*(u[IX(i+1,j)]-u[IX(i-1,j)] + v[IX(i,j+1)]-v[IX(i,j-1)]); p[IX(i,j)]=0; } } set_bnd(0,div); set_bnd(0,p); lin_solve(0,p,div,1,4,it); for(let j=1;j<=N;j++){ for(let i=1;i<=N;i++){ u[IX(i,j)] -= .5*(p[IX(i+1,j)]-p[IX(i-1,j)])/h; v[IX(i,j)] -= .5*(p[IX(i,j+1)]-p[IX(i,j-1)])/h; } } set_bnd(1,u); set_bnd(2,v); }
-  let iterEff= +rangeIter.value|0;
-  function step(){ const dt=+ui.dt.value, visc=+ui.visc.value, diff=+ui.diff.value, it=ui.adaptive.checked?iterEff:(+ui.iter.value|0), decay=+ui.decay.value; add_source(u,u0,dt); add_source(v,v0,dt); [u0,u]=[u,u0]; diffuse(1,u,u0,visc,dt,it); [v0,v]=[v,v0]; diffuse(2,v,v0,visc,dt,it); project(u,v,p,div,it); [u0,u]=[u,u0]; [v0,v]=[v,v0]; advect(1,u,u0,u0,v0,dt); advect(2,v,v0,u0,v0,dt); project(u,v,p,div,it); add_source(densR,d0R,dt); add_source(densG,d0G,dt); add_source(densB,d0B,dt); [d0R,densR]=[densR,d0R]; diffuse(0,densR,d0R,diff,dt,it); [d0G,densG]=[densG,d0G]; diffuse(0,densG,d0G,diff,dt,it); [d0B,densB]=[densB,d0B]; diffuse(0,densB,d0B,diff,dt,it); [d0R,densR]=[densR,d0R]; advect(0,densR,d0R,u,v,dt); [d0G,densG]=[densG,d0G]; advect(0,densG,d0G,u,v,dt); [d0B,densB]=[densB,d0B]; advect(0,densB,d0B,u,v,dt); const k=Math.max(0,1-decay*dt); for(let i=0;i<densR.length;i++){ densR[i]*=k; densG[i]*=k; densB[i]*=k; } u0.fill(0); v0.fill(0); d0R.fill(0); d0G.fill(0); d0B.fill(0); }
 
-  // ---------- Rendering with Display controls ----------
-  const ctx = canvas.getContext('2d',{alpha:false, desynchronized:true});
+  function alloc(){
+    size = (N+2)*(N+2);
+    IX = (i,j) => i + (N+2)*j;
+    const F32 = Float32Array;
+    u = new F32(size); v = new F32(size); u0 = new F32(size); v0 = new F32(size);
+    densR = new F32(size); densG = new F32(size); densB = new F32(size);
+    d0R = new F32(size); d0G = new F32(size); d0B = new F32(size);
+    p = new F32(size); div = new F32(size);
+  }
+
+  function set_bnd(b, x){
+    const Np1 = N+1;
+    for(let i=1;i<=N;i++){
+      x[IX(0,i)]   = b===1 ? -x[IX(1,i)] : x[IX(1,i)];
+      x[IX(Np1,i)] = b===1 ? -x[IX(N,i)] : x[IX(N,i)];
+      x[IX(i,0)]   = b===2 ? -x[IX(i,1)] : x[IX(i,1)];
+      x[IX(i,Np1)] = b===2 ? -x[IX(i,N)] : x[IX(i,N)];
+    }
+    x[IX(0,0)]       = 0.5*(x[IX(1,0)]   + x[IX(0,1)]);
+    x[IX(0,Np1)]     = 0.5*(x[IX(1,Np1)] + x[IX(0,N)]);
+    x[IX(Np1,0)]     = 0.5*(x[IX(N,0)]   + x[IX(Np1,1)]);
+    x[IX(Np1,Np1)]   = 0.5*(x[IX(N,Np1)] + x[IX(Np1,N)]);
+  }
+
+  function add_source(x, s, dt){
+    for(let i=0;i<size;i++) x[i] += dt * s[i];
+  }
+
+  function lin_solve(b, x, x0, a, c, iters){
+    const cInv = 1.0 / c;
+    for(let k=0;k<iters;k++){
+      for(let j=1;j<=N;j++){
+        const row = (N+2)*j;
+        for(let i=1;i<=N;i++){
+          x[row+i] = (x0[row+i] + a*(x[row+i-1] + x[row+i+1] + x[row+i-(N+2)] + x[row+i+(N+2)])) * cInv;
+        }
+      }
+      set_bnd(b, x);
+    }
+  }
+
+  function diffuse(b, x, x0, diff, dt, iters){
+    const a = dt * diff * N * N;
+    lin_solve(b, x, x0, a, 1 + 4*a, iters);
+  }
+
+  function advect(b, d, d0, u, v, dt){
+    const dt0x = dt * N; // cells per second
+    const dt0y = dt * N;
+    for(let j=1;j<=N;j++){
+      for(let i=1;i<=N;i++){
+        let x = i - dt0x * u[IX(i,j)];
+        let y = j - dt0y * v[IX(i,j)];
+        x = clamp(x, 0.5, N + 0.5);
+        y = clamp(y, 0.5, N + 0.5);
+        const i0 = Math.floor(x), i1 = i0 + 1;
+        const j0 = Math.floor(y), j1 = j0 + 1;
+        const s1 = x - i0, s0 = 1 - s1;
+        const t1 = y - j0, t0 = 1 - t1;
+        d[IX(i,j)] = s0*(t0*d0[IX(i0,j0)] + t1*d0[IX(i0,j1)]) + s1*(t0*d0[IX(i1,j0)] + t1*d0[IX(i1,j1)]);
+      }
+    }
+    set_bnd(b, d);
+  }
+
+  function project(u,v,p,div,iters){
+    const h = 1.0 / N;
+    for(let j=1;j<=N;j++){
+      for(let i=1;i<=N;i++){
+        div[IX(i,j)] = -0.5*h*(u[IX(i+1,j)] - u[IX(i-1,j)] + v[IX(i,j+1)] - v[IX(i,j-1)]);
+        p[IX(i,j)] = 0;
+      }
+    }
+    set_bnd(0, div); set_bnd(0, p);
+    lin_solve(0, p, div, 1, 4, iters);
+    for(let j=1;j<=N;j++){
+      for(let i=1;i<=N;i++){
+        u[IX(i,j)] -= 0.5*(p[IX(i+1,j)] - p[IX(i-1,j)]) / h;
+        v[IX(i,j)] -= 0.5*(p[IX(i,j+1)] - p[IX(i,j-1)]) / h;
+      }
+    }
+    set_bnd(1,u); set_bnd(2,v);
+  }
+
+  // Current effective iteration budget (used when adaptive is on)
+  let iterEff = +document.getElementById('rangeIter').value|0;
+
+  function step(){
+    const dt = +ui.dt.value;
+    const visc = +ui.visc.value;
+    const diff = +ui.diff.value;
+    const iters = ui.adaptive.checked ? iterEff : (+ui.iter.value|0);
+    const decay = +ui.decay.value;
+
+    // Velocity
+    add_source(u, u0, dt); add_source(v, v0, dt);
+    [u0,u] = [u,u0]; diffuse(1, u, u0, visc, dt, iters);
+    [v0,v] = [v,v0]; diffuse(2, v, v0, visc, dt, iters);
+    project(u,v,p,div,iters);
+    [u0,u] = [u,u0]; [v0,v] = [v,v0];
+    advect(1, u, u0, u0, v0, dt);
+    advect(2, v, v0, u0, v0, dt);
+    project(u,v,p,div,iters);
+
+    // Dye (R,G,B)
+    add_source(densR, d0R, dt); add_source(densG, d0G, dt); add_source(densB, d0B, dt);
+    [d0R,densR] = [densR,d0R]; diffuse(0, densR, d0R, diff, dt, iters);
+    [d0G,densG] = [densG,d0G]; diffuse(0, densG, d0G, diff, dt, iters);
+    [d0B,densB] = [densB,d0B]; diffuse(0, densB, d0B, diff, dt, iters);
+    [d0R,densR] = [densR,d0R]; advect(0, densR, d0R, u, v, dt);
+    [d0G,densG] = [densG,d0G]; advect(0, densG, d0G, u, v, dt);
+    [d0B,densB] = [densB,d0B]; advect(0, densB, d0B, u, v, dt);
+
+    const decayFactor = Math.max(0, 1 - decay * dt);
+    for(let i=0;i<size;i++){ densR[i]*=decayFactor; densG[i]*=decayFactor; densB[i]*=decayFactor; }
+
+    // reset sources
+    u0.fill(0); v0.fill(0); d0R.fill(0); d0G.fill(0); d0B.fill(0);
+  }
+
+  // ---------- Rendering ----------
+  const ctx = canvas.getContext('2d', { alpha:false, desynchronized:true });
   let pix, imgData;
-  function resizeCanvas(){ const ratio=dprCap()*+ui.scale.value; const w=(canvas.clientWidth*ratio)|0; const h=(canvas.clientHeight*ratio)|0; if(w<2||h<2) return; if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; imgData=ctx.createImageData(w,h); pix=imgData.data; } }
-
-  function tone(v){
-    const exposure = +ui.exp.value;
-    const gamma = +ui.gamma.value;
-    const contrast = +ui.contrast.value;
-    const black = +ui.black.value;
-    // Exposure + filmic-like tone map
-    v = 1 - Math.exp(-exposure * v);
-    // Black level
-    v = Math.max(0, (v - black)) / (1 - black + 1e-6);
-    // Gamma (gamma<1 = più brillante)
-    v = Math.pow(v, 1/Math.max(1e-3,gamma));
-    // Contrast around mid gray
-    v = (v - 0.5) * contrast + 0.5;
-    return clamp(v, 0, 1);
+  function resizeCanvas(){
+    const ratio = dprCap() * +ui.scale.value;
+    const w = (canvas.clientWidth * ratio) | 0;
+    const h = (canvas.clientHeight * ratio) | 0;
+    if (w<2 || h<2) return;
+    if (canvas.width!==w || canvas.height!==h){
+      canvas.width = w; canvas.height = h;
+      imgData = ctx.createImageData(w, h);
+      pix = imgData.data;
+    }
   }
 
   function render(){
     resizeCanvas();
-    const w=canvas.width, h=canvas.height; const sx=N/w, sy=N/h; let k=0;
+    const w = canvas.width, h = canvas.height;
+    if (w < 2 || h < 2 || !imgData) return;
+    const sx = N / w, sy = N / h; // pixels -> grid scaling
+    let k = 0;
     for(let y=0;y<h;y++){
-      const gy=1+(y+0.5)*sy; const j=Math.max(1,Math.min(N,gy|0));
+      const gy = 1 + (y+0.5)*sy; // center-sample
+      const j = Math.max(1, Math.min(N, gy|0));
       for(let x=0;x<w;x++){
-        const gx=1+(x+0.5)*sx; const i=Math.max(1,Math.min(N,gx|0));
+        const gx = 1 + (x+0.5)*sx;
+        const i = Math.max(1, Math.min(N, gx|0));
         const idx = IX(i,j);
-        let r = tone(densR[idx]);
-        let g = tone(densG[idx]);
-        let b = tone(densB[idx]);
-        pix[k++] = (r*255)|0; pix[k++] = (g*255)|0; pix[k++] = (b*255)|0; pix[k++] = 255;
+        let r = densR[idx], g = densG[idx], b = densB[idx];
+        // tone map a bit
+        r = 255 * (1 - Math.exp(-r));
+        g = 255 * (1 - Math.exp(-g));
+        b = 255 * (1 - Math.exp(-b));
+        pix[k++] = r; pix[k++] = g; pix[k++] = b; pix[k++] = 255;
       }
     }
-    ctx.putImageData(imgData,0,0);
+    ctx.putImageData(imgData, 0, 0);
   }
 
-  // ---------- Mouse/touch brush ----------
-  let isDown=false, erase=false, lastX=0, lastY=0;
-  function toGrid(x,y){ const gx=1+(x/canvas.width)*N; const gy=1+(y/canvas.height)*N; return {i: clamp(Math.floor(gx),1,N), j: clamp(Math.floor(gy),1,N)}; }
-  function stamp(array,i,j,radius,amount){ const r=Math.max(1,radius|0), r2=r*r; for(let y=-r;y<=r;y++){ const jj=j+y; if(jj<1||jj>N) continue; for(let x=-r;x<=r;x++){ const ii=i+x; if(ii<1||ii>N) continue; const d2=x*x+y*y; if(d2>r2) continue; const w=Math.exp(-d2/(2*(r*.45)*(r*.45))); array[IX(ii,jj)] += amount*w; } } }
-  function applyBrush(x,y,dx,dy){ const {i,j}=toGrid(x,y); const rad=+ui.rad.value, force=+ui.force.value, dyeAmt=+ui.dyeAmt.value; if(!erase){ stamp(u0,i,j,rad,force*dx); stamp(v0,i,j,rad,force*dy); const [r,g,b]=selColor; stamp(d0R,i,j,rad,dyeAmt*r); stamp(d0G,i,j,rad,dyeAmt*g); stamp(d0B,i,j,rad,dyeAmt*b); } else { stamp(d0R,i,j,rad,-6*dyeAmt); stamp(d0G,i,j,rad,-6*dyeAmt); stamp(d0B,i,j,rad,-6*dyeAmt); stamp(u0,i,j,rad,-force*dx*.5); stamp(v0,i,j,rad,-force*dy*.5); } }
-  function pointerPos(e){ const rect=canvas.getBoundingClientRect(); const px=(e.clientX-rect.left)*dprCap()*+ui.scale.value; const py=(e.clientY-rect.top)*dprCap()*+ui.scale.value; return {x:px,y:py}; }
-  canvas.addEventListener('contextmenu', e=>e.preventDefault());
-  canvas.addEventListener('pointerdown', e=>{ isDown=true; const {x,y}=pointerPos(e); lastX=x; lastY=y; if(e.button===2) erase=true; });
-  window.addEventListener('pointerup', ()=>{ isDown=false; erase=false; });
-  window.addEventListener('pointermove', e=>{ if(!isDown) return; const {x,y}=pointerPos(e); const dx=(x-lastX)/canvas.width*N; const dy=(y-lastY)/canvas.height*N; lastX=x; lastY=y; applyBrush(x,y,dx,dy); });
+  // ---------- Interaction (mouse/touch) ----------
+  let isDown = false, erase = false, lastX=0, lastY=0;
+  function toGrid(x, y){
+    const gx = 1 + (x / canvas.width) * N;
+    const gy = 1 + (y / canvas.height) * N;
+    return {i: clamp(Math.floor(gx),1,N), j: clamp(Math.floor(gy),1,N)};
+  }
+  function stamp(array, i, j, radius, amount){
+    const r = Math.max(1, radius|0), r2 = r*r;
+    for(let y=-r;y<=r;y++){
+      const jj = j + y; if (jj<1||jj>N) continue;
+      for(let x=-r;x<=r;x++){
+        const ii = i + x; if (ii<1||ii>N) continue;
+        const d2 = x*x + y*y; if (d2>r2) continue;
+        const w = Math.exp(-d2/(2*(r*0.45)*(r*0.45)));
+        array[IX(ii,jj)] += amount * w;
+      }
+    }
+  }
+  function applyBrush(x, y, dx, dy){
+    const {i,j} = toGrid(x,y);
+    const rad = +ui.rad.value;
+    const force = +ui.force.value;
+    const dyeAmt = +ui.dyeAmt.value;
+    if (!erase){
+      stamp(u0, i, j, rad, force * dx);
+      stamp(v0, i, j, rad, force * dy);
+      const [r,g,b] = selColor;
+      stamp(d0R, i, j, rad, dyeAmt * r);
+      stamp(d0G, i, j, rad, dyeAmt * g);
+      stamp(d0B, i, j, rad, dyeAmt * b);
+    } else {
+      stamp(d0R, i, j, rad, -6 * dyeAmt);
+      stamp(d0G, i, j, rad, -6 * dyeAmt);
+      stamp(d0B, i, j, rad, -6 * dyeAmt);
+      stamp(u0, i, j, rad, -force * dx * 0.5);
+      stamp(v0, i, j, rad, -force * dy * 0.5);
+    }
+  }
+  function pointerPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * dprCap() * +ui.scale.value;
+    const py = (e.clientY - rect.top) * dprCap() * +ui.scale.value;
+    return {x:px, y:py};
+  }
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  function onDown(e){ isDown = true; const {x,y} = pointerPos(e); lastX=x; lastY=y; if (e.button===2) erase = true; }
+  function onUp(){ isDown=false; erase=false; }
+  function onMove(e){
+    if (!isDown) return;
+    const {x,y} = pointerPos(e);
+    const dx = (x - lastX) / canvas.width * N;
+    const dy = (y - lastY) / canvas.height * N;
+    lastX = x; lastY = y;
+    applyBrush(x, y, dx, dy);
+  }
+  canvas.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointermove', onMove);
 
-  // ---------- Hand tracking (pinch) ----------
-  let camRunning=false, hands=null, camObj=null;
-  async function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Failed '+src)); document.head.appendChild(s); }); }
-  async function ensureMediapipe(){ if(window.Hands && window.Camera) return; await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js'); await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'); }
+  // ---------- Hand tracking (webcam) ----------
+  let camRunning = false, hands = null, camObj = null;
+  let selColor = [0.25, 0.82, 1.0];
+  const paletteColors = ['#3fd0ff','#ff5ea8','#ffd166','#7cff6b','#9381ff','#ff6b6b','#00e4b8','#ffffff'];
+  function setActiveSwatch(el){
+    for (const s of ui.palette.querySelectorAll('.swatch')) s.classList.remove('active');
+    if (el) el.classList.add('active');
+  }
+  paletteColors.forEach((hex, i) => {
+    const sw = document.createElement('button');
+    sw.className = 'swatch'; sw.style.background = hex; sw.title = hex;
+    sw.addEventListener('click', () => { ui.color.value = hex; ui.outHex.textContent = hex; selColor = hexToRgb01(hex); setActiveSwatch(sw); });
+    if (i===0) setActiveSwatch(sw);
+    ui.palette.appendChild(sw);
+  });
+  ui.color.addEventListener('input', () => { selColor = hexToRgb01(ui.color.value); setActiveSwatch(null); });
+  function hexToRgb01(hex){ const v = hex.replace('#',''); return [parseInt(v.substring(0,2),16)/255, parseInt(v.substring(2,4),16)/255, parseInt(v.substring(4,6),16)/255]; }
+
+  let camX=0, camY=0, camPrevX=0, camPrevY=0, pinchActive=false, pinchPrev=false;
+  async function loadScript(src){ return new Promise((res, rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Failed '+src)); document.head.appendChild(s); }); }
+  async function ensureMediapipe(){
+    if (window.Hands && window.Camera) return;
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js');
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
+    // drawing_utils optional, skipped for perf
+  }
+  function setCursor(x,y){ cursor.style.left = x+'px'; cursor.style.top = y+'px'; }
+
   function normDist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
-  function setCursorPos(x,y){ cursor.style.left=x+'px'; cursor.style.top=y+'px'; }
-  function showCursor(show){ cursor.style.opacity = show ? '1' : '0'; if(!show){ cursor.style.left='-1000px'; cursor.style.top='-1000px'; } }
 
-  let selColor=[0.25,0.82,1.0];
+  async function startCamera(){
+    if (camRunning) return;
+    await ensureMediapipe();
+    hands = new Hands({ locateFile: (f)=> `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    hands.setOptions({ maxNumHands:1, modelComplexity:1, selfieMode:true, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+    hands.onResults(onHandsResults);
+    camObj = new Camera(video, { width:640, height:480, onFrame: async ()=>{ await hands.send({ image: video }); } });
+    await camObj.start();
+    camRunning = true; ui.btnCam.textContent = '🛑 Stop camera';
+  }
+  function stopCamera(){
+    if (!camRunning) return;
+    try { camObj.stop && camObj.stop(); } catch(e){}
+    try { const s = video.srcObject; if (s) s.getTracks().forEach(t=>t.stop()); } catch(e){}
+    camRunning = false; ui.btnCam.textContent = '📷 Start camera'; setCursor(-1000,-1000);
+  }
+
   function onHandsResults(res){
-    if (!ui.chkHand.checked){ showCursor(false); return; }
-    if (!res.multiHandLandmarks || !res.multiHandLandmarks.length){ showCursor(false); return; }
+    if (!ui.chkHand.checked) { setCursor(-1000,-1000); return; }
+    if (!res.multiHandLandmarks || !res.multiHandLandmarks.length){ pinchActive=false; setCursor(-1000,-1000); return; }
     const lm = res.multiHandLandmarks[0];
-    let x = lm[8].x, y = lm[8].y; if (ui.mirror.checked) x = 1 - x;
+    let x = lm[8].x, y = lm[8].y; // index tip
+    if (ui.mirror.checked) x = 1 - x;
+
+    // pinch detection normalized by hand size
     const pinch = normDist(lm[4], lm[8]);
     const handSize = normDist(lm[0], lm[9]) + 1e-6;
-    const pinchActive = (pinch / handSize) < 0.35;
-    const targetX = x*canvas.width, targetY=y*canvas.height;
-    const s = +ui.smooth.value;
-    if (typeof onHandsResults.camX === 'undefined'){ onHandsResults.camX=targetX; onHandsResults.camY=targetY; onHandsResults.prevX=targetX; onHandsResults.prevY=targetY; }
-    const camX = onHandsResults.camX = lerp(onHandsResults.camX, targetX, 1 - s);
-    const camY = onHandsResults.camY = lerp(onHandsResults.camY, targetY, 1 - s);
-    const dxPx = camX - onHandsResults.prevX;
-    const dyPx = camY - onHandsResults.prevY;
+    const pinchRatio = pinch / handSize;
+    const pinchThresh = 0.35; // lower = easier to press
+    pinchPrev = pinchActive;
+    pinchActive = pinchRatio < pinchThresh; // true when pinching
+
+    const targetX = x * canvas.width;
+    const targetY = y * canvas.height;
+    const s = +ui.smooth.value; // 0..0.95
+    camX = lerp(camX, targetX, 1 - s);
+    camY = lerp(camY, targetY, 1 - s);
+
+    // prime previous when starting pinch to avoid spikes
+    if (pinchActive && !pinchPrev){ camPrevX = camX; camPrevY = camY; }
+
+    setCursor(camX, camY);
+
     if (pinchActive){
       const sens = +ui.sens.value;
-      const dx = dxPx / canvas.width * N * sens;
-      const dy = dyPx / canvas.height * N * sens;
+      const dx = (camX - camPrevX) / canvas.width * N * sens;
+      const dy = (camY - camPrevY) / canvas.height * N * sens;
       applyBrush(camX, camY, dx, dy);
-      showCursor(false);
-    } else {
-      setCursorPos(camX, camY); showCursor(true);
     }
-    onHandsResults.prevX = camX; onHandsResults.prevY = camY;
+    camPrevX = camX; camPrevY = camY;
   }
-  async function startCamera(){ if (camRunning) return; await ensureMediapipe(); hands=new Hands({ locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` }); hands.setOptions({ maxNumHands:1, modelComplexity:1, selfieMode:true, minDetectionConfidence:0.6, minTrackingConfidence:0.6 }); hands.onResults(onHandsResults); camObj = new Camera(video,{ width:640, height:480, onFrame: async ()=>{ await hands.send({ image: video }); } }); await camObj.start(); camRunning=true; ui.btnCam.textContent='🛑 Stop camera'; updateHud(); }
-  function stopCamera(){ if(!camRunning) return; try{ camObj.stop && camObj.stop(); }catch(e){} try{ const s=video.srcObject; if(s) s.getTracks().forEach(t=>t.stop()); }catch(e){} camRunning=false; ui.btnCam.textContent='📷 Start camera'; showCursor(false); updateHud(); }
 
   // ---------- Controls ----------
   function recreate(){ N = +ui.N.value|0; alloc(); }
-  rangeN.addEventListener('change', recreate);
-  rangeIter.addEventListener('input', ()=>{ if (!ui.adaptive.checked) iterEff = +ui.iter.value|0; });
-  btnPause.addEventListener('click', ()=>{ paused=!paused; btnPause.textContent = paused? '▶ Resume':'⏯ Pause'; });
-  btnClearDye.addEventListener('click', ()=>{ densR.fill(0); densG.fill(0); densB.fill(0); });
-  btnClearVel.addEventListener('click', ()=>{ u.fill(0); v.fill(0); u0.fill(0); v0.fill(0); });
-  btnSplash.addEventListener('click', ()=>{ randomSplash(); });
-  btnInvert.addEventListener('click', ()=>{ erase = !erase; btnInvert.textContent = '🧽 Erase: ' + (erase? 'On':'Off'); });
-  btnPresetSpeed.addEventListener('click', ()=>{ rangeScale.value = 0.6; chkHidpi.checked=false; rangeIter.value=24; iterEff=24; labelFor(rangeScale, outScale); labelFor(rangeIter, outIter); });
-  btnPresetQuality.addEventListener('click', ()=>{ rangeScale.value = 1.0; chkHidpi.checked=true; rangeIter.value=48; iterEff=48; labelFor(rangeScale, outScale); labelFor(rangeIter, outIter); });
-  btnCam.addEventListener('click', ()=>{ camRunning ? stopCamera() : startCamera(); });
+  ui.N.addEventListener('change', recreate);
+  ui.scale.addEventListener('input', ()=>{ /* canvas resizes on next frame */});
+  ui.hidpi.addEventListener('change', ()=>{ /* canvas resizes on next frame */});
+  ui.iter.addEventListener('input', ()=>{ if (!ui.adaptive.checked) iterEff = +ui.iter.value|0; });
+  ui.btnPause.addEventListener('click', ()=>{ paused=!paused; ui.btnPause.textContent = paused? '▶ Resume':'⏯ Pause'; });
+  ui.btnClearDye.addEventListener('click', ()=>{ densR.fill(0); densG.fill(0); densB.fill(0); });
+  ui.btnClearVel.addEventListener('click', ()=>{ u.fill(0); v.fill(0); u0.fill(0); v0.fill(0); });
+  ui.btnSplash.addEventListener('click', ()=>{ randomSplash(); });
+  ui.btnInvert.addEventListener('click', ()=>{ erase = !erase; ui.btnInvert.textContent = '🧽 Erase: ' + (erase? 'On':'Off'); });
+  ui.btnPresetSpeed.addEventListener('click', ()=>{ ui.scale.value = 0.6; ui.hidpi.checked=false; ui.iter.value=24; iterEff=24; labelFor(ui.scale, ui.outScale); labelFor(ui.iter, ui.outIter); });
+  ui.btnPresetQuality.addEventListener('click', ()=>{ ui.scale.value = 1.0; ui.hidpi.checked=true; ui.iter.value=48; iterEff=48; labelFor(ui.scale, ui.outScale); labelFor(ui.iter, ui.outIter); });
+  ui.btnCam.addEventListener('click', ()=>{ camRunning ? stopCamera() : startCamera(); });
 
   window.addEventListener('keydown', (e)=>{
-    if (e.code==='Space'){ e.preventDefault(); btnPause.click(); }
-    else if (e.key==='c' || e.key==='C') btnClearDye.click();
-    else if (e.key==='v' || e.key==='V') btnClearVel.click();
-    else if (e.key==='r' || e.key==='R') btnSplash.click();
+    if (e.code==='Space'){ e.preventDefault(); ui.btnPause.click(); }
+    else if (e.key==='c' || e.key==='C') ui.btnClearDye.click();
+    else if (e.key==='v' || e.key==='V') ui.btnClearVel.click();
+    else if (e.key==='r' || e.key==='R') ui.btnSplash.click();
   });
 
   // ---------- HUD / Stats ----------
-  let lastT=performance.now(), acc=0, frames=0, fps=60, paused=false;
-  function updateHud(){ hud.innerHTML = `FPS: ${fps.toFixed(0)} | N: ${N}×${N} | scale ${(+ui.scale.value).toFixed(2)}${ui.hidpi.checked?'@HiDPI':''}<br>`+`iters ${ui.adaptive.checked? `${iterEff} (adaptive ≤ ${(+ui.iter.value)})` : (+ui.iter.value)} | dt ${(+ui.dt.value).toFixed(3)} | visc ${(+ui.visc.value).toFixed(4)} | diff ${(+ui.diff.value).toFixed(4)}<br>`+`exp ${(+ui.exp.value).toFixed(2)} • gamma ${(+ui.gamma.value).toFixed(2)} • contrast ${(+ui.contrast.value).toFixed(2)} • black ${(+ui.black.value).toFixed(3)} • cam ${camRunning? 'on':'off'}`; }
+  let lastT = performance.now(), acc=0, frames=0, fps=60, paused=false;
+  function updateHud(){
+    hud.innerHTML = `FPS: ${fps.toFixed(0)} | N: ${N}×${N} | renderScale ${(+ui.scale.value).toFixed(2)}${ui.hidpi.checked?'@HiDPI':''}<br>`+
+      `iters ${ui.adaptive.checked? `${iterEff} (adaptive ≤ ${(+ui.iter.value)})` : (+ui.iter.value)} | dt ${(+ui.dt.value).toFixed(3)} | visc ${(+ui.visc.value).toFixed(4)} | diff ${(+ui.diff.value).toFixed(4)}<br>`+
+      `cam ${camRunning? 'on':'off'} • hand ${ui.chkHand.checked? 'on':'off'}${pinchActive? ' • pinch':''}`;
+  }
 
-  function tick(t){ if(!paused) step(); render(); frames++; acc += (t - lastT); lastT = t; if(acc>500){ const fpsNow = frames*1000/acc; fps=fpsNow; frames=0; acc=0; updateHud(); if(ui.adaptive.checked){ if(fpsNow<52) iterEff=Math.max(10, iterEff-2); else if(fpsNow>64) iterEff=Math.min(+ui.iter.value|0, iterEff+2); } } requestAnimationFrame(tick); }
+  function tick(t){
+    if (!paused) step();
+    render();
+    frames++; acc += (t - lastT); lastT = t;
+    if (acc > 500){
+      const fpsNow = frames * 1000 / acc; fps = fpsNow; frames=0; acc=0; updateHud();
+      if (ui.adaptive.checked){
+        if (fpsNow < 52) iterEff = Math.max(10, iterEff - 2);
+        else if (fpsNow > 64) iterEff = Math.min(+ui.iter.value|0, iterEff + 2);
+      }
+    }
+    requestAnimationFrame(tick);
+  }
 
-  function randomSplash(){ const count=10; for(let k=0;k<count;k++){ const i=1+Math.random()*N|0; const j=1+Math.random()*N|0; const rad=5+Math.random()*15|0; const force=40+Math.random()*120; const amt=2+Math.random()*8; const col=hexToRgb01(paletteColors[Math.random()*paletteColors.length|0]); stamp(u0,i,j,rad,(Math.random()-.5)*force); stamp(v0,i,j,rad,(Math.random()-.5)*force); stamp(d0R,i,j,rad,amt*col[0]); stamp(d0G,i,j,rad,amt*col[1]); stamp(d0B,i,j,rad,amt*col[2]); } }
+  function randomSplash(){
+    const count = 10;
+    for(let k=0;k<count;k++){
+      const i = 1 + Math.random()*N|0;
+      const j = 1 + Math.random()*N|0;
+      const rad = 5 + Math.random()*15|0;
+      const force = 40 + Math.random()*120;
+      const amt = 2 + Math.random()*8;
+      const col = hexToRgb01(paletteColors[Math.random()*paletteColors.length|0]);
+      stamp(u0,i,j,rad,(Math.random()-.5)*force);
+      stamp(v0,i,j,rad,(Math.random()-.5)*force);
+      stamp(d0R,i,j,rad,amt*col[0]);
+      stamp(d0G,i,j,rad,amt*col[1]);
+      stamp(d0B,i,j,rad,amt*col[2]);
+    }
+  }
 
   // ---------- Boot ----------
   alloc();
   const ro = new ResizeObserver(()=>resizeCanvas()); ro.observe(canvas);
+  window.addEventListener('resize', resizeCanvas);
   updateHud();
+  // Visual kick so si vede anche senza interazione
+  randomSplash();
   requestAnimationFrame(tick);
 })();
 </script>
