@@ -80,12 +80,11 @@
                 <!-- Color and Action Buttons -->
                 <div class="flex items-center gap-3">
                     <div id="color-palette" class="flex items-center gap-2">
-                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200 active" style="background-color: #e60073;" data-color="[230, 0, 115]"></button>
-                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #00bfff;" data-color="[0, 191, 255]"></button>
-                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #ffdd00;" data-color="[255, 221, 0]"></button>
-                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #39ff14;" data-color="[57, 255, 20]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200 active" style="background-color: #ff0080;" data-color="[255, 0, 128]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #00ffff;" data-color="[0, 255, 255]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #ffff00;" data-color="[255, 255, 0]"></button>
+                        <button class="color-btn w-8 h-8 rounded-full transition-transform duration-200" style="background-color: #7fff00;" data-color="[127, 255, 0]"></button>
                     </div>
-                    <!-- NEW: Camera Selector -->
                     <div class="flex flex-col space-y-1">
                          <label for="camera-select" class="text-xs font-medium text-gray-300">Camera</label>
                          <select id="camera-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-1.5"></select>
@@ -109,16 +108,18 @@
         const cameraSelect = document.getElementById('camera-select');
 
         // --- Simulation parameters ---
-        const N = 128; const iter = 4;
+        // MODIFICATION: Increased grid size for higher resolution
+        const N = 192; 
+        const iter = 4;
         let dt = 0.1; let diff = 0.000001; let visc = 0.00002;
-        let force = 60; let source = 20; // MODIFICATION: Reduced initial dye amount
+        let force = 60; let source = 20;
         
         let showControls = true;
         const controlsPanel = document.getElementById('controls');
         const fluid = new Fluid(dt, diff, visc);
         let pointer = { x: 0, y: 0, dx: 0, dy: 0, down: false };
         let lastHandPos = { x: 0, y: 0 };
-        let activeColor = [230, 0, 115];
+        let activeColor = [255, 0, 128];
 
         // --- Global variables for camera management ---
         let activeVideoStream = null;
@@ -267,7 +268,7 @@
         function animate() {
             if (pointer.down) {
                 const gridX = Math.floor(pointer.x * (N + 2)); const gridY = Math.floor(pointer.y * (N + 2));
-                const emitterSize = 1; // MODIFICATION: Reduced emitter size
+                const emitterSize = 1;
                 for (let i = -emitterSize; i <= emitterSize; i++) {
                     for (let j = -emitterSize; j <= emitterSize; j++) {
                         const currentX = gridX + i; const currentY = gridY + j;
